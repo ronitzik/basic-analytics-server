@@ -1,8 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sqlite3
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, List
 
 # Create the FastAPI app
 app = FastAPI()
@@ -13,9 +13,18 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row  # This allows us to access columns by name
     return conn
 
+# Define the request body model using Pydantic
+class GetReportsRequest(BaseModel):
+    lastseconds: int
+    userid: str
 
-# Define the data model for the request body using Pydantic
 class Event(BaseModel):
+    userid: str
+    eventname: str
+
+# Define the response model using Pydantic
+class ReportResponse(BaseModel):
+    eventtimestamputc: str
     userid: str
     eventname: str
 
@@ -46,5 +55,47 @@ async def process_event(event: Event) -> dict[str, Any]:
         return {"message": "Event processed successfully"}
     except Exception as e:
         return {"error": str(e)}
+    finally:
+        conn.close()
+
+# POST endpoint to get reports based on last X seconds for a given userid
+@app.post("/get_reports")
+async def get_reports(request: GetReportsRequest) -> List[ReportResponse]:
+    """
+    Get reports for a specific user that happened within the last X seconds.
+
+    Parameters:
+    - request: A request object containing lastseconds (int) and userid (str)
+
+    Returns:
+    - A list of events that occurred within the last X seconds for the given user
+    """
+    # Calculate the time threshold (X seconds ago from now)
+    time_threshold = datetime.utcnow() - timedelta(seconds=request.lastseconds)
+    time_threshold_str = time_threshold.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Connect to the database and query for events within the time range
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT eventtimestamputc, userid, eventname FROM events WHERE userid = ? AND eventtimestamputc >= ?",
+            (request.userid, time_threshold_str)
+        )
+        rows = cursor.fetchall()
+
+        # Prepare the response list
+        reports = [
+            ReportResponse(
+                eventtimestamputc=row["eventtimestamputc"],
+                userid=row["userid"],
+                eventname=row["eventname"]
+            )
+            for row in rows
+        ]
+
+        return reports
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
