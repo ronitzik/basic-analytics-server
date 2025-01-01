@@ -13,6 +13,27 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row  # This allows us to access columns by name
     return conn
 
+# Create the events table if it doesn't exist
+def create_events_table():
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                eventtimestamputc TEXT NOT NULL,
+                userid TEXT NOT NULL,
+                eventname TEXT NOT NULL
+            );
+        """)
+        conn.commit()
+    except Exception as e:
+        print(f"Error creating table: {e}")
+    finally:
+        conn.close()
+
+# Call the function to create the table when the app starts
+create_events_table()
+
 # Define the request body model using Pydantic
 class GetReportsRequest(BaseModel):
     lastseconds: int
