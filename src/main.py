@@ -49,6 +49,17 @@ class ReportResponse(BaseModel):
     userid: str
     eventname: str
 
+# Root endpoint to show a welcome message
+@app.get("/")
+async def root():
+    """
+    Welcome endpoint to display a message when the app loads.
+
+    Returns:
+    - A welcome message as a dictionary.
+    """
+    return {"message": "Welcome to my app!"}
+
 # POST endpoint to process the event
 @app.post("/process_event")
 async def process_event(event: Event) -> dict[str, Any]:
